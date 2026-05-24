@@ -1,0 +1,27 @@
+{
+  "name": "mesto-ad",
+  "version": "1.0.0",
+  "description": "Стартовый набор для выполнения проектной работы Место",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Imanov-Sabutay/mesto-ad.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Imanov-Sabutay/mesto-ad/issues"
+  },
+  "homepage": "https://github.com/Imanov-Sabutay/mesto-ad#readme",
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "vite": "^8.0.14"
+  }
+}
