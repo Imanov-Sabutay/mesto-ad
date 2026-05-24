@@ -5,24 +5,17 @@ const getTemplate = () => {
     .cloneNode(true);
 };
 
-export const createCardElement = (
-  data,
-  userId,
-  { onPreviewPicture, onLikeIcon, onDeleteCard, onInfoClick }
-) => {
+export const createCardElement = (data, userId) => {
   const cardElement = getTemplate();
   const likeButton = cardElement.querySelector(".card__like-button");
   const likeCountElement = cardElement.querySelector(".card__like-count");
   const deleteButton = cardElement.querySelector(
     ".card__control-button_type_delete"
   );
-  const infoButton = cardElement.querySelector(
-    ".card__control-button_type_info"
-  );
   const cardImage = cardElement.querySelector(".card__image");
 
   cardElement.dataset.cardId = data._id;
-  cardImage.loading = "lazy";
+  cardImage.decoding = "async";
   cardImage.src = data.link;
   cardImage.alt = data.name;
   cardElement.querySelector(".card__title").textContent = data.name;
@@ -35,22 +28,6 @@ export const createCardElement = (
 
   if (data.owner._id !== userId) {
     deleteButton.remove();
-  } else if (onDeleteCard) {
-    deleteButton.addEventListener("click", () => onDeleteCard(cardElement));
-  }
-
-  if (onLikeIcon) {
-    likeButton.addEventListener("click", () => onLikeIcon(cardElement, likeButton));
-  }
-
-  if (onPreviewPicture) {
-    cardImage.addEventListener("click", () =>
-      onPreviewPicture({ name: data.name, link: data.link })
-    );
-  }
-
-  if (onInfoClick) {
-    infoButton.addEventListener("click", () => onInfoClick(data._id, infoButton));
   }
 
   return cardElement;

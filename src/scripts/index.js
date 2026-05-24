@@ -76,18 +76,10 @@ const cardInfoModalUserList = cardInfoModalWindow.querySelector(".popup__list");
 
 let currentUserId = "";
 let cardToDelete = null;
-const pendingLikeCardIds = new Set();
-const pendingInfoCardIds = new Set();
+const likeSyncState = new Map();
 const cardsCache = new Map();
 let activeInfoCardId = null;
 let infoCardsRequest = null;
-
-const cardHandlers = {
-  onPreviewPicture: null,
-  onLikeIcon: null,
-  onDeleteCard: null,
-  onInfoClick: null,
-};
 
 const setButtonLoadingState = (button, isLoading, loadingText) => {
   if (isLoading) {
@@ -156,16 +148,171 @@ const requestCardsForInfo = () => {
   return infoCardsRequest;
 };
 
+const APP_DATA_STORAGE_KEY = "mesto-app-data";
+
+const removeCardsLoader = () => {
+  placesWrap.classList.remove("places__list_loading");
+  placesWrap.querySelectorAll(".card_skeleton").forEach((skeletonCard) => {
+    skeletonCard.remove();
+  });
+};
+
 const renderCards = (cards) => {
+  if (cards.length === 0) {
+    return;
+  }
+
   const cardFragment = document.createDocumentFragment();
 
   cards.forEach((cardData) => {
-    cardFragment.append(
-      createCardElement(cardData, currentUserId, cardHandlers)
-    );
+    cardFragment.append(createCardElement(cardData, currentUserId));
   });
 
   placesWrap.append(cardFragment);
+};
+
+const saveAppDataToStorage = (userData, cards) => {
+  try {
+    localStorage.setItem(
+      APP_DATA_STORAGE_KEY,
+      JSON.stringify({ userData, cards })
+    );
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const syncAppDataToStorage = () => {
+  if (!currentUserId) {
+    return;
+  }
+
+  const cards = Array.from(cardsCache.values());
+  const avatarMatch = profileAvatar.style.backgroundImage.match(
+    /url\(["']?(.+?)["']?\)/
+  );
+
+  saveAppDataToStorage(
+    {
+      _id: currentUserId,
+      name: profileTitle.textContent,
+      about: profileDescription.textContent,
+      avatar: avatarMatch ? avatarMatch[1] : "",
+    },
+    cards
+  );
+};
+
+const applyUserData = (userData) => {
+  currentUserId = userData._id;
+  profileTitle.textContent = userData.name;
+  profileDescription.textContent = userData.about;
+  profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
+};
+
+const syncCardsInDom = (cards) => {
+  const serverCardIds = new Set(cards.map((cardData) => cardData._id));
+
+  placesWrap.querySelectorAll(".card").forEach((cardElement) => {
+    if (!serverCardIds.has(cardElement.dataset.cardId)) {
+      cardElement.remove();
+    }
+  });
+
+  const existingCards = new Map();
+
+  placesWrap.querySelectorAll(".card").forEach((cardElement) => {
+    existingCards.set(cardElement.dataset.cardId, cardElement);
+  });
+
+  cards.forEach((cardData) => {
+    const cardElement = existingCards.get(cardData._id);
+
+    if (cardElement) {
+      updateCardLikeState(cardElement, cardData, currentUserId);
+      cardElement.querySelector(".card__title").textContent = cardData.name;
+      return;
+    }
+
+    placesWrap.append(createCardElement(cardData, currentUserId));
+  });
+};
+
+const applyAppData = (userData, cards) => {
+  applyUserData(userData);
+  updateCardsCache(cards);
+  removeCardsLoader();
+  placesWrap.replaceChildren();
+  renderCards(cards);
+};
+
+const hasRenderedCards = () =>
+  Boolean(placesWrap.querySelector(".card:not(.card_skeleton)"));
+
+const loadCachedAppData = () => {
+  try {
+    const storedData = localStorage.getItem(APP_DATA_STORAGE_KEY);
+
+    if (!storedData) {
+      return false;
+    }
+
+    const { userData, cards } = JSON.parse(storedData);
+
+    if (!userData?._id || !Array.isArray(cards)) {
+      return false;
+    }
+
+    applyUserData(userData);
+    updateCardsCache(cards);
+
+    if (!hasRenderedCards()) {
+      applyAppData(userData, cards);
+    }
+
+    return true;
+  } catch (err) {
+    console.log(err);
+    return false;
+  }
+};
+
+const setPlacesListClickHandler = () => {
+  placesWrap.addEventListener("click", (evt) => {
+    const cardElement = evt.target.closest(".places__item.card");
+
+    if (!cardElement || cardElement.classList.contains("card_skeleton")) {
+      return;
+    }
+
+    const cardId = cardElement.dataset.cardId;
+
+    if (evt.target.closest(".card__like-button")) {
+      handleLikeClick(
+        cardElement,
+        cardElement.querySelector(".card__like-button")
+      );
+      return;
+    }
+
+    if (evt.target.closest(".card__control-button_type_delete")) {
+      handleDeleteCardClick(cardElement);
+      return;
+    }
+
+    if (evt.target.closest(".card__image")) {
+      const cardData = cardsCache.get(cardId);
+
+      if (cardData) {
+        handlePreviewPicture({ name: cardData.name, link: cardData.link });
+      }
+      return;
+    }
+
+    if (evt.target.closest(".card__control-button_type_info")) {
+      handleInfoClick(cardId);
+    }
+  });
 };
 
 const fillCardInfoModal = (cardData) => {
@@ -209,37 +356,92 @@ const handlePreviewPicture = ({ name, link }) => {
   openModalWindow(imageModalWindow);
 };
 
+const isCardLikedByUser = (cardData) =>
+  cardData.likes.some((user) => user._id === currentUserId);
+
+const isLikeButtonActive = (likeButton) =>
+  likeButton.classList.contains("card__like-button_is-active");
+
+const syncLikeWithServer = (cardElement, likeButton) => {
+  const cardId = cardElement.dataset.cardId;
+
+  if (!cardId || !currentUserId) {
+    return;
+  }
+
+  const cardData = cardsCache.get(cardId);
+
+  if (!cardData) {
+    return;
+  }
+
+  const state = likeSyncState.get(cardId) ?? { inFlight: false, needsSync: false };
+  const serverLiked = isCardLikedByUser(cardData);
+  const uiLiked = isLikeButtonActive(likeButton);
+
+  if (serverLiked === uiLiked) {
+    state.needsSync = false;
+    likeSyncState.set(cardId, state);
+    return;
+  }
+
+  if (state.inFlight) {
+    state.needsSync = true;
+    likeSyncState.set(cardId, state);
+    return;
+  }
+
+  state.inFlight = true;
+  state.needsSync = false;
+  likeSyncState.set(cardId, state);
+
+  changeLikeCardStatus(cardId, serverLiked)
+    .then((updatedCardData) => {
+      updateCardInCache(updatedCardData);
+      updateCardLikeState(cardElement, updatedCardData, currentUserId);
+      syncAppDataToStorage();
+    })
+    .catch((err) => {
+      console.log(err);
+      updateCardLikeState(cardElement, cardData, currentUserId);
+    })
+    .finally(() => {
+      const currentState = likeSyncState.get(cardId) ?? {
+        inFlight: false,
+        needsSync: false,
+      };
+      const actualCardData = cardsCache.get(cardId) ?? cardData;
+
+      currentState.inFlight = false;
+
+      const shouldSyncAgain =
+        currentState.needsSync ||
+        isLikeButtonActive(likeButton) !== isCardLikedByUser(actualCardData);
+
+      currentState.needsSync = false;
+      likeSyncState.set(cardId, currentState);
+
+      if (shouldSyncAgain) {
+        syncLikeWithServer(cardElement, likeButton);
+      }
+    });
+};
+
 const handleLikeClick = (cardElement, likeButton) => {
   const cardId = cardElement.dataset.cardId;
 
-  if (!cardId || pendingLikeCardIds.has(cardId)) {
+  if (!cardId) {
     return;
   }
 
   const likeCountElement = cardElement.querySelector(".card__like-count");
-  const wasLiked = likeButton.classList.contains("card__like-button_is-active");
+  const wasLiked = isLikeButtonActive(likeButton);
   const previousCount = Number(likeCountElement.textContent);
-
-  pendingLikeCardIds.add(cardId);
-  likeButton.disabled = true;
 
   likeButton.classList.toggle("card__like-button_is-active");
   likeCountElement.textContent = wasLiked ? previousCount - 1 : previousCount + 1;
 
-  changeLikeCardStatus(cardId, wasLiked)
-    .then((cardData) => {
-      updateCardInCache(cardData);
-      updateCardLikeState(cardElement, cardData, currentUserId);
-    })
-    .catch((err) => {
-      console.log(err);
-      likeButton.classList.toggle("card__like-button_is-active", wasLiked);
-      likeCountElement.textContent = previousCount;
-    })
-    .finally(() => {
-      pendingLikeCardIds.delete(cardId);
-      likeButton.disabled = false;
-    });
+  syncLikeWithServer(cardElement, likeButton);
 };
 
 const handleDeleteCardClick = (cardElement) => {
@@ -259,6 +461,7 @@ const handleRemoveCardSubmit = (evt) => {
       cardToDelete.remove();
       cardToDelete = null;
       closeModalWindow(removeCardModalWindow);
+      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
@@ -272,7 +475,7 @@ const resetCardToDelete = () => {
   cardToDelete = null;
 };
 
-const handleInfoClick = (cardId, infoButton) => {
+const handleInfoClick = (cardId) => {
   if (!cardId) {
     return;
   }
@@ -280,13 +483,6 @@ const handleInfoClick = (cardId, infoButton) => {
   activeInfoCardId = cardId;
   fillCardInfoModal(cardsCache.get(cardId));
   openModalWindow(cardInfoModalWindow);
-
-  if (pendingInfoCardIds.has(cardId)) {
-    return;
-  }
-
-  pendingInfoCardIds.add(cardId);
-  infoButton.disabled = true;
 
   requestCardsForInfo()
     .then(() => {
@@ -298,10 +494,6 @@ const handleInfoClick = (cardId, infoButton) => {
     })
     .catch((err) => {
       console.log(err);
-    })
-    .finally(() => {
-      pendingInfoCardIds.delete(cardId);
-      infoButton.disabled = false;
     });
 };
 
@@ -317,6 +509,7 @@ const handleProfileFormSubmit = (evt) => {
       profileTitle.textContent = userData.name;
       profileDescription.textContent = userData.about;
       closeModalWindow(profileFormModalWindow);
+      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
@@ -337,6 +530,7 @@ const handleAvatarFormSubmit = (evt) => {
       profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
       closeModalWindow(avatarFormModalWindow);
       avatarForm.reset();
+      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
@@ -356,11 +550,10 @@ const handleCardFormSubmit = (evt) => {
   })
     .then((cardData) => {
       updateCardInCache(cardData);
-      placesWrap.prepend(
-        createCardElement(cardData, currentUserId, cardHandlers)
-      );
+      placesWrap.prepend(createCardElement(cardData, currentUserId));
       closeModalWindow(cardFormModalWindow);
       cardForm.reset();
+      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
@@ -370,10 +563,62 @@ const handleCardFormSubmit = (evt) => {
     });
 };
 
-cardHandlers.onPreviewPicture = handlePreviewPicture;
-cardHandlers.onLikeIcon = handleLikeClick;
-cardHandlers.onDeleteCard = handleDeleteCardClick;
-cardHandlers.onInfoClick = handleInfoClick;
+setPlacesListClickHandler();
+
+const bootstrapApp = () => {
+  const hadCache = loadCachedAppData();
+
+  if (hadCache) {
+    removeCardsLoader();
+  }
+
+  let pendingUserData = null;
+  let pendingCards = null;
+
+  const tryFinishCards = () => {
+    if (!pendingCards || !currentUserId) {
+      return;
+    }
+
+    if (!hasRenderedCards()) {
+      removeCardsLoader();
+      placesWrap.replaceChildren();
+      renderCards(pendingCards);
+    } else {
+      syncCardsInDom(pendingCards);
+    }
+
+    if (pendingUserData) {
+      saveAppDataToStorage(pendingUserData, pendingCards);
+    }
+  };
+
+  getUserInfo()
+    .then((userData) => {
+      pendingUserData = userData;
+      applyUserData(userData);
+      tryFinishCards();
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+
+  getCardList()
+    .then((cards) => {
+      pendingCards = cards;
+      updateCardsCache(cards);
+      tryFinishCards();
+    })
+    .catch((err) => {
+      console.log(err);
+
+      if (!hasRenderedCards()) {
+        removeCardsLoader();
+      }
+    });
+};
+
+bootstrapApp();
 
 profileForm.addEventListener("submit", handleProfileFormSubmit);
 cardForm.addEventListener("submit", handleCardFormSubmit);
@@ -418,21 +663,3 @@ document.addEventListener("keyup", (evt) => {
 });
 
 enableValidation(validationSettings);
-
-placesWrap.classList.add("places__list_loading");
-
-Promise.all([getCardList(), getUserInfo()])
-  .then(([cards, userData]) => {
-    currentUserId = userData._id;
-    profileTitle.textContent = userData.name;
-    profileDescription.textContent = userData.about;
-    profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
-    updateCardsCache(cards);
-    renderCards(cards);
-  })
-  .catch((err) => {
-    console.log(err);
-  })
-  .finally(() => {
-    placesWrap.classList.remove("places__list_loading");
-  });
