@@ -22,6 +22,7 @@ export const createCardElement = (
   const cardImage = cardElement.querySelector(".card__image");
 
   cardElement.dataset.cardId = data._id;
+  cardImage.loading = "lazy";
   cardImage.src = data.link;
   cardImage.alt = data.name;
   cardElement.querySelector(".card__title").textContent = data.name;

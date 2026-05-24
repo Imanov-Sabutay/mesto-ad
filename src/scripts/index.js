@@ -157,11 +157,15 @@ const requestCardsForInfo = () => {
 };
 
 const renderCards = (cards) => {
+  const cardFragment = document.createDocumentFragment();
+
   cards.forEach((cardData) => {
-    placesWrap.append(
+    cardFragment.append(
       createCardElement(cardData, currentUserId, cardHandlers)
     );
   });
+
+  placesWrap.append(cardFragment);
 };
 
 const fillCardInfoModal = (cardData) => {
@@ -205,19 +209,6 @@ const handlePreviewPicture = ({ name, link }) => {
   openModalWindow(imageModalWindow);
 };
 
-const syncCardLikeState = (cardElement) => {
-  const cardId = cardElement.dataset.cardId;
-
-  return getCardList().then((cards) => {
-    updateCardsCache(cards);
-    const cardData = cards.find((card) => card._id === cardId);
-
-    if (cardData) {
-      updateCardLikeState(cardElement, cardData, currentUserId);
-    }
-  });
-};
-
 const handleLikeClick = (cardElement, likeButton) => {
   const cardId = cardElement.dataset.cardId;
 
@@ -225,19 +216,25 @@ const handleLikeClick = (cardElement, likeButton) => {
     return;
   }
 
+  const likeCountElement = cardElement.querySelector(".card__like-count");
+  const wasLiked = likeButton.classList.contains("card__like-button_is-active");
+  const previousCount = Number(likeCountElement.textContent);
+
   pendingLikeCardIds.add(cardId);
   likeButton.disabled = true;
 
-  const isLiked = likeButton.classList.contains("card__like-button_is-active");
+  likeButton.classList.toggle("card__like-button_is-active");
+  likeCountElement.textContent = wasLiked ? previousCount - 1 : previousCount + 1;
 
-  changeLikeCardStatus(cardId, isLiked)
+  changeLikeCardStatus(cardId, wasLiked)
     .then((cardData) => {
       updateCardInCache(cardData);
       updateCardLikeState(cardElement, cardData, currentUserId);
     })
     .catch((err) => {
       console.log(err);
-      return syncCardLikeState(cardElement);
+      likeButton.classList.toggle("card__like-button_is-active", wasLiked);
+      likeCountElement.textContent = previousCount;
     })
     .finally(() => {
       pendingLikeCardIds.delete(cardId);
@@ -422,6 +419,8 @@ document.addEventListener("keyup", (evt) => {
 
 enableValidation(validationSettings);
 
+placesWrap.classList.add("places__list_loading");
+
 Promise.all([getCardList(), getUserInfo()])
   .then(([cards, userData]) => {
     currentUserId = userData._id;
@@ -433,4 +432,7 @@ Promise.all([getCardList(), getUserInfo()])
   })
   .catch((err) => {
     console.log(err);
+  })
+  .finally(() => {
+    placesWrap.classList.remove("places__list_loading");
   });
