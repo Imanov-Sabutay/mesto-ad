@@ -200,7 +200,7 @@ function handleInfoClick(cardId) {
 const handleProfileFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(profileSubmitButton, true, "Сохранение...", "Сохранить");
+  setButtonLoadingState(profileSubmitButton, true, "Сохранение…", "Сохранить");
 
   setUserInfo({
     name: profileTitleInput.value,
@@ -217,7 +217,7 @@ const handleProfileFormSubmit = (evt) => {
       setButtonLoadingState(
         profileSubmitButton,
         false,
-        "Сохранение...",
+        "Сохранение…",
         "Сохранить"
       );
     });
@@ -226,7 +226,7 @@ const handleProfileFormSubmit = (evt) => {
 const handleAvatarFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(avatarSubmitButton, true, "Сохранение...", "Сохранить");
+  setButtonLoadingState(avatarSubmitButton, true, "Сохранение…", "Сохранить");
 
   setUserAvatar({
     avatar: avatarInput.value,
@@ -242,7 +242,7 @@ const handleAvatarFormSubmit = (evt) => {
       setButtonLoadingState(
         avatarSubmitButton,
         false,
-        "Сохранение...",
+        "Сохранение…",
         "Сохранить"
       );
     });
@@ -251,7 +251,7 @@ const handleAvatarFormSubmit = (evt) => {
 const handleCardFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(cardSubmitButton, true, "Создание...", "Создать");
+  setButtonLoadingState(cardSubmitButton, true, "Создание…", "Создать");
 
   addCard({
     name: cardNameInput.value,
@@ -267,14 +267,14 @@ const handleCardFormSubmit = (evt) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(cardSubmitButton, false, "Создание...", "Создать");
+      setButtonLoadingState(cardSubmitButton, false, "Создание…", "Создать");
     });
 };
 
 const handleDeleteCardFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(deleteCardSubmitButton, true, "Удаление...", "Да");
+  setButtonLoadingState(deleteCardSubmitButton, true, "Удаление…", "Да");
 
   deleteCardFromServer(cardIdToDelete)
     .then(() => {
@@ -287,7 +287,7 @@ const handleDeleteCardFormSubmit = (evt) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(deleteCardSubmitButton, false, "Удаление...", "Да");
+      setButtonLoadingState(deleteCardSubmitButton, false, "Удаление…", "Да");
     });
 };
 
@@ -322,20 +322,10 @@ allPopups.forEach((popup) => {
 
 enableValidation(validationSettings);
 
-const userDataPromise = getUserInfo();
-const cardsDataPromise = getCardList();
-
-userDataPromise
-  .then((userData) => {
+Promise.all([getCardList(), getUserInfo()])
+  .then(([cards, userData]) => {
     currentUserId = userData._id;
     renderUserInfo(userData);
-  })
-  .catch((err) => {
-    console.log(err);
-  });
-
-Promise.all([cardsDataPromise, userDataPromise])
-  .then(([cards]) => {
     renderCards(cards, currentUserId);
   })
   .catch((err) => {
