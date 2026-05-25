@@ -18,7 +18,7 @@
   "bugs": {
     "url": "https://github.com/Imanov-Sabutay/mesto-ad/issues"
   },
-  "homepage": "https://imanov-sabutay.github.io/mesto-production/",
+  "homepage": "https://imanov-sabutay.github.io/mesto-ad/",
   "devDependencies": {
     "gh-pages": "^6.3.0",
     "vite": "^8.0.14"
