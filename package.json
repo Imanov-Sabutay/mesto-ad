@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && gh-pages -d dist --repo https://github.com/Imanov-Sabutay/mesto-production.git"
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "repository": {
     "type": "git",

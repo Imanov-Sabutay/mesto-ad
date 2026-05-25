@@ -8,8 +8,8 @@ https://imanov-sabutay.github.io/mesto-production/
 
 ## Репозитории
 
-- **mesto-ad** — приватный репозиторий с исходным кодом (для работы и сдачи в Практикум).
-- **mesto-production** — публичный репозиторий для GitHub Pages.
+- **mesto-ad** (приватный) — исходный код и деплой для Практикума.
+- **mesto-production** (публичный) — опубликованный сайт на GitHub Pages.
 
 ## Технологии
 
@@ -24,12 +24,19 @@ https://imanov-sabutay.github.io/mesto-production/
 npm install    # установка зависимостей
 npm run dev    # запуск локального сервера разработки
 npm run build  # сборка проекта в папку dist
-npm run deploy # сборка и публикация в mesto-production (ветка gh-pages)
+npm run deploy # сборка и публикация в mesto-ad (ветка gh-pages)
 ```
 
-## GitHub Pages
+## Как работает публикация
 
-Публикация идёт в репозиторий **mesto-production**.
+1. **`npm run deploy`** — собирает проект и публикует в **mesto-ad** (ветка `gh-pages`).
+   - В **mesto-ad**: Settings → Pages → Branch: `gh-pages`, Folder: `/ (root)`.
 
-1. Выполните `npm run deploy`.
-2. В репозитории **mesto-production**: **Settings → Pages → Branch: `gh-pages`**, **Folder: `/ (root)`**.
+2. **`git push origin main`** — запускает GitHub Action **Deploy to Public Pages Repository**.
+   - Сборка из `main` копируется в **mesto-production** (ветка `main`).
+   - В **mesto-production** появляется deployment; сайт: https://imanov-sabutay.github.io/mesto-production/
+   - В **mesto-production**: Settings → Pages → Branch: `main`, Folder: `/ (root)`.
+
+### Секрет для Action
+
+В **mesto-ad** → Settings → Secrets → Actions должен быть секрет **`GH_TOKEN`** — Personal Access Token с правом `repo` для push в `mesto-production`.
