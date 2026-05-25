@@ -322,10 +322,20 @@ allPopups.forEach((popup) => {
 
 enableValidation(validationSettings);
 
-Promise.all([getCardList(), getUserInfo()])
-  .then(([cards, userData]) => {
+const userDataPromise = getUserInfo();
+const cardsDataPromise = getCardList();
+
+userDataPromise
+  .then((userData) => {
     currentUserId = userData._id;
     renderUserInfo(userData);
+  })
+  .catch((err) => {
+    console.log(err);
+  });
+
+Promise.all([cardsDataPromise, userDataPromise])
+  .then(([cards]) => {
     renderCards(cards, currentUserId);
   })
   .catch((err) => {
