@@ -18,7 +18,7 @@ import {
 import {
   createCardElement,
   updateCardLikeState,
-  deleteCardElement,
+  removeCardElement,
 } from "./components/card.js";
 import {
   openModalWindow,
@@ -79,8 +79,7 @@ const cardInfoModalText = cardInfoModalWindow.querySelector(".popup__text");
 const cardInfoModalUserList = cardInfoModalWindow.querySelector(".popup__list");
 
 let currentUserId = "";
-let cardIdToDelete = null;
-let cardElementToDelete = null;
+let cardToDelete = null;
 
 const formatDate = (date) =>
   date.toLocaleDateString("ru-RU", {
@@ -155,9 +154,8 @@ function handleLikeClick(cardId, cardElement, likeButton) {
     });
 }
 
-function handleDeleteClick(cardId, cardElement) {
-  cardIdToDelete = cardId;
-  cardElementToDelete = cardElement;
+function handleDeleteClick(cardElement, cardId) {
+  cardToDelete = { cardElement, cardId };
   openModalWindow(deleteCardModalWindow);
 }
 
@@ -200,7 +198,7 @@ function handleInfoClick(cardId) {
 const handleProfileFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(profileSubmitButton, true, "Сохранение…", "Сохранить");
+  setButtonLoadingState(profileSubmitButton, true, "Сохранение...", "Сохранить");
 
   setUserInfo({
     name: profileTitleInput.value,
@@ -217,7 +215,7 @@ const handleProfileFormSubmit = (evt) => {
       setButtonLoadingState(
         profileSubmitButton,
         false,
-        "Сохранение…",
+        "Сохранение...",
         "Сохранить"
       );
     });
@@ -226,7 +224,7 @@ const handleProfileFormSubmit = (evt) => {
 const handleAvatarFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(avatarSubmitButton, true, "Сохранение…", "Сохранить");
+  setButtonLoadingState(avatarSubmitButton, true, "Сохранение...", "Сохранить");
 
   setUserAvatar({
     avatar: avatarInput.value,
@@ -242,7 +240,7 @@ const handleAvatarFormSubmit = (evt) => {
       setButtonLoadingState(
         avatarSubmitButton,
         false,
-        "Сохранение…",
+        "Сохранение...",
         "Сохранить"
       );
     });
@@ -251,7 +249,7 @@ const handleAvatarFormSubmit = (evt) => {
 const handleCardFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(cardSubmitButton, true, "Создание…", "Создать");
+  setButtonLoadingState(cardSubmitButton, true, "Создание...", "Создать");
 
   addCard({
     name: cardNameInput.value,
@@ -267,27 +265,30 @@ const handleCardFormSubmit = (evt) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(cardSubmitButton, false, "Создание…", "Создать");
+      setButtonLoadingState(cardSubmitButton, false, "Создание...", "Создать");
     });
 };
 
 const handleDeleteCardFormSubmit = (evt) => {
   evt.preventDefault();
 
-  setButtonLoadingState(deleteCardSubmitButton, true, "Удаление…", "Да");
+  if (!cardToDelete) {
+    return;
+  }
 
-  deleteCardFromServer(cardIdToDelete)
+  setButtonLoadingState(deleteCardSubmitButton, true, "Удаление...", "Да");
+
+  deleteCardFromServer(cardToDelete.cardId)
     .then(() => {
-      deleteCardElement(cardElementToDelete);
+      removeCardElement(cardToDelete.cardElement);
       closeModalWindow(deleteCardModalWindow);
-      cardIdToDelete = null;
-      cardElementToDelete = null;
+      cardToDelete = null;
     })
     .catch((err) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(deleteCardSubmitButton, false, "Удаление…", "Да");
+      setButtonLoadingState(deleteCardSubmitButton, false, "Удаление...", "Да");
     });
 };
 

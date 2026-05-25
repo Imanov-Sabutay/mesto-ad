@@ -34,7 +34,9 @@ export const createCardElement = (
   if (data.owner._id !== userId) {
     deleteButton.remove();
   } else if (onDeleteCard) {
-    deleteButton.addEventListener("click", () => onDeleteCard(data._id, cardElement));
+    deleteButton.addEventListener("click", () =>
+      onDeleteCard(cardElement, data._id)
+    );
   }
 
   if (onLikeIcon) {
@@ -65,6 +67,6 @@ export const updateCardLikeState = (cardElement, cardData, userId) => {
   likeCountElement.textContent = cardData.likes.length;
 };
 
-export const deleteCardElement = (cardElement) => {
+export const removeCardElement = (cardElement) => {
   cardElement.remove();
 };
