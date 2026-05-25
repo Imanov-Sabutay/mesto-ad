@@ -12,10 +12,14 @@ import {
   setUserInfo,
   setUserAvatar,
   addCard,
-  deleteCard,
+  deleteCard as deleteCardFromServer,
   changeLikeCardStatus,
 } from "./components/api.js";
-import { createCardElement, updateCardLikeState } from "./components/card.js";
+import {
+  createCardElement,
+  updateCardLikeState,
+  deleteCardElement,
+} from "./components/card.js";
 import {
   openModalWindow,
   closeModalWindow,
@@ -36,17 +40,17 @@ const validationSettings = {
 const placesWrap = document.querySelector(".places__list");
 const profileFormModalWindow = document.querySelector(".popup_type_edit");
 const profileForm = profileFormModalWindow.querySelector(".popup__form");
-const profileSubmitButton = profileForm.querySelector(".popup__button");
 const profileTitleInput = profileForm.querySelector(".popup__input_type_name");
 const profileDescriptionInput = profileForm.querySelector(
   ".popup__input_type_description"
 );
+const profileSubmitButton = profileForm.querySelector(".popup__button");
 
 const cardFormModalWindow = document.querySelector(".popup_type_new-card");
 const cardForm = cardFormModalWindow.querySelector(".popup__form");
-const cardSubmitButton = cardForm.querySelector(".popup__button");
 const cardNameInput = cardForm.querySelector(".popup__input_type_card-name");
 const cardLinkInput = cardForm.querySelector(".popup__input_type_url");
+const cardSubmitButton = cardForm.querySelector(".popup__button");
 
 const imageModalWindow = document.querySelector(".popup_type_image");
 const imageElement = imageModalWindow.querySelector(".popup__image");
@@ -61,12 +65,12 @@ const profileAvatar = document.querySelector(".profile__image");
 
 const avatarFormModalWindow = document.querySelector(".popup_type_edit-avatar");
 const avatarForm = avatarFormModalWindow.querySelector(".popup__form");
-const avatarSubmitButton = avatarForm.querySelector(".popup__button");
 const avatarInput = avatarForm.querySelector(".popup__input");
+const avatarSubmitButton = avatarForm.querySelector(".popup__button");
 
-const removeCardModalWindow = document.querySelector(".popup_type_remove-card");
-const removeCardForm = removeCardModalWindow.querySelector(".popup__form");
-const removeCardSubmitButton = removeCardForm.querySelector(".popup__button");
+const deleteCardModalWindow = document.querySelector(".popup_type_remove-card");
+const deleteCardForm = deleteCardModalWindow.querySelector(".popup__form");
+const deleteCardSubmitButton = deleteCardForm.querySelector(".popup__button");
 
 const cardInfoModalWindow = document.querySelector(".popup_type_info");
 const cardInfoModalTitle = cardInfoModalWindow.querySelector(".popup__title");
@@ -75,23 +79,8 @@ const cardInfoModalText = cardInfoModalWindow.querySelector(".popup__text");
 const cardInfoModalUserList = cardInfoModalWindow.querySelector(".popup__list");
 
 let currentUserId = "";
-let cardToDelete = null;
-const likeSyncState = new Map();
-const cardsCache = new Map();
-let activeInfoCardId = null;
-let infoCardsRequest = null;
-
-const setButtonLoadingState = (button, isLoading, loadingText) => {
-  if (isLoading) {
-    button.dataset.defaultText = button.textContent;
-    button.textContent = loadingText;
-    button.disabled = true;
-    return;
-  }
-
-  button.textContent = button.dataset.defaultText;
-  button.disabled = false;
-};
+let cardIdToDelete = null;
+let cardElementToDelete = null;
 
 const formatDate = (date) =>
   date.toLocaleDateString("ru-RU", {
@@ -100,530 +89,212 @@ const formatDate = (date) =>
     day: "numeric",
   });
 
-const getInfoTemplate = () => {
-  return document
-    .getElementById("popup-info-definition-template")
-    .content.querySelector(".popup__info-item")
-    .cloneNode(true);
+const setButtonLoadingState = (button, isLoading, loadingText, defaultText) => {
+  button.textContent = isLoading ? loadingText : defaultText;
+  button.disabled = isLoading;
 };
 
 const createInfoString = (term, description) => {
-  const infoElement = getInfoTemplate();
+  const infoElement = document
+    .getElementById("popup-info-definition-template")
+    .content.querySelector(".popup__info-item")
+    .cloneNode(true);
+
   infoElement.querySelector(".popup__info-term").textContent = term;
   infoElement.querySelector(".popup__info-description").textContent = description;
+
   return infoElement;
 };
 
-const getUserPreviewTemplate = () => {
-  return document
+const createUserPreview = (userName) => {
+  const userElement = document
     .getElementById("popup-info-user-preview-template")
     .content.querySelector(".popup__list-item")
     .cloneNode(true);
+
+  userElement.textContent = userName;
+
+  return userElement;
 };
 
-const updateCardsCache = (cards) => {
-  cards.forEach((cardData) => {
-    cardsCache.set(cardData._id, cardData);
-  });
-};
-
-const updateCardInCache = (cardData) => {
-  if (cardData?._id) {
-    cardsCache.set(cardData._id, cardData);
-  }
-};
-
-const requestCardsForInfo = () => {
-  if (!infoCardsRequest) {
-    infoCardsRequest = getCardList()
-      .then((cards) => {
-        updateCardsCache(cards);
-        return cards;
-      })
-      .finally(() => {
-        infoCardsRequest = null;
-      });
-  }
-
-  return infoCardsRequest;
-};
-
-const APP_DATA_STORAGE_KEY = "mesto-app-data";
-
-const removeCardsLoader = () => {
-  placesWrap.classList.remove("places__list_loading");
-  placesWrap.querySelectorAll(".card_skeleton").forEach((skeletonCard) => {
-    skeletonCard.remove();
-  });
-};
-
-const renderCards = (cards) => {
-  if (cards.length === 0) {
-    return;
-  }
-
-  const cardFragment = document.createDocumentFragment();
-
-  cards.forEach((cardData) => {
-    cardFragment.append(createCardElement(cardData, currentUserId));
-  });
-
-  placesWrap.append(cardFragment);
-};
-
-const saveAppDataToStorage = (userData, cards) => {
-  try {
-    localStorage.setItem(
-      APP_DATA_STORAGE_KEY,
-      JSON.stringify({ userData, cards })
-    );
-  } catch (err) {
-    console.log(err);
-  }
-};
-
-const syncAppDataToStorage = () => {
-  if (!currentUserId) {
-    return;
-  }
-
-  const cards = Array.from(cardsCache.values());
-  const avatarMatch = profileAvatar.style.backgroundImage.match(
-    /url\(["']?(.+?)["']?\)/
-  );
-
-  saveAppDataToStorage(
-    {
-      _id: currentUserId,
-      name: profileTitle.textContent,
-      about: profileDescription.textContent,
-      avatar: avatarMatch ? avatarMatch[1] : "",
-    },
-    cards
-  );
-};
-
-const applyUserData = (userData) => {
-  currentUserId = userData._id;
+const renderUserInfo = (userData) => {
   profileTitle.textContent = userData.name;
   profileDescription.textContent = userData.about;
   profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
 };
 
-const syncCardsInDom = (cards) => {
-  const serverCardIds = new Set(cards.map((cardData) => cardData._id));
+const cardHandlers = {
+  onPreviewPicture: handlePreviewPicture,
+  onLikeIcon: handleLikeClick,
+  onDeleteCard: handleDeleteClick,
+  onInfoClick: handleInfoClick,
+};
 
-  placesWrap.querySelectorAll(".card").forEach((cardElement) => {
-    if (!serverCardIds.has(cardElement.dataset.cardId)) {
-      cardElement.remove();
-    }
-  });
-
-  const existingCards = new Map();
-
-  placesWrap.querySelectorAll(".card").forEach((cardElement) => {
-    existingCards.set(cardElement.dataset.cardId, cardElement);
-  });
-
+const renderCards = (cards, userId) => {
   cards.forEach((cardData) => {
-    const cardElement = existingCards.get(cardData._id);
-
-    if (cardElement) {
-      updateCardLikeState(cardElement, cardData, currentUserId);
-      cardElement.querySelector(".card__title").textContent = cardData.name;
-      return;
-    }
-
-    placesWrap.append(createCardElement(cardData, currentUserId));
+    placesWrap.append(createCardElement(cardData, userId, cardHandlers));
   });
 };
 
-const applyAppData = (userData, cards) => {
-  applyUserData(userData);
-  updateCardsCache(cards);
-  removeCardsLoader();
-  placesWrap.replaceChildren();
-  renderCards(cards);
-};
-
-const hasRenderedCards = () =>
-  Boolean(placesWrap.querySelector(".card:not(.card_skeleton)"));
-
-const loadCachedAppData = () => {
-  try {
-    const storedData = localStorage.getItem(APP_DATA_STORAGE_KEY);
-
-    if (!storedData) {
-      return false;
-    }
-
-    const { userData, cards } = JSON.parse(storedData);
-
-    if (!userData?._id || !Array.isArray(cards)) {
-      return false;
-    }
-
-    applyUserData(userData);
-    updateCardsCache(cards);
-
-    if (!hasRenderedCards()) {
-      applyAppData(userData, cards);
-    }
-
-    return true;
-  } catch (err) {
-    console.log(err);
-    return false;
-  }
-};
-
-const setPlacesListClickHandler = () => {
-  placesWrap.addEventListener("click", (evt) => {
-    const cardElement = evt.target.closest(".places__item.card");
-
-    if (!cardElement || cardElement.classList.contains("card_skeleton")) {
-      return;
-    }
-
-    const cardId = cardElement.dataset.cardId;
-
-    if (evt.target.closest(".card__like-button")) {
-      handleLikeClick(
-        cardElement,
-        cardElement.querySelector(".card__like-button")
-      );
-      return;
-    }
-
-    if (evt.target.closest(".card__control-button_type_delete")) {
-      handleDeleteCardClick(cardElement);
-      return;
-    }
-
-    if (evt.target.closest(".card__image")) {
-      const cardData = cardsCache.get(cardId);
-
-      if (cardData) {
-        handlePreviewPicture({ name: cardData.name, link: cardData.link });
-      }
-      return;
-    }
-
-    if (evt.target.closest(".card__control-button_type_info")) {
-      handleInfoClick(cardId);
-    }
-  });
-};
-
-const fillCardInfoModal = (cardData) => {
-  cardInfoModalTitle.textContent = "Информация о карточке";
-  cardInfoModalInfoList.replaceChildren();
-  cardInfoModalUserList.replaceChildren();
-
-  if (!cardData) {
-    cardInfoModalInfoList.append(createInfoString("Загрузка:", "…"));
-    cardInfoModalText.textContent = "";
-    return;
-  }
-
-  cardInfoModalInfoList.append(
-    createInfoString("Описание:", cardData.name),
-    createInfoString(
-      "Дата создания:",
-      formatDate(new Date(cardData.createdAt))
-    ),
-    createInfoString("Владелец:", cardData.owner.name),
-    createInfoString("Количество лайков:", String(cardData.likes.length))
-  );
-
-  if (cardData.likes.length > 0) {
-    cardInfoModalText.textContent = "Лайкнули:";
-
-    cardData.likes.forEach((user) => {
-      const userPreviewElement = getUserPreviewTemplate();
-      userPreviewElement.textContent = user.name;
-      cardInfoModalUserList.append(userPreviewElement);
-    });
-  } else {
-    cardInfoModalText.textContent = "";
-  }
-};
-
-const handlePreviewPicture = ({ name, link }) => {
+function handlePreviewPicture({ name, link }) {
   imageElement.src = link;
   imageElement.alt = name;
   imageCaption.textContent = name;
   openModalWindow(imageModalWindow);
-};
+}
 
-const isCardLikedByUser = (cardData) =>
-  cardData.likes.some((user) => user._id === currentUserId);
+function handleLikeClick(cardId, cardElement, likeButton) {
+  const isLiked = likeButton.classList.contains("card__like-button_is-active");
 
-const isLikeButtonActive = (likeButton) =>
-  likeButton.classList.contains("card__like-button_is-active");
-
-const syncLikeWithServer = (cardElement, likeButton) => {
-  const cardId = cardElement.dataset.cardId;
-
-  if (!cardId || !currentUserId) {
-    return;
-  }
-
-  const cardData = cardsCache.get(cardId);
-
-  if (!cardData) {
-    return;
-  }
-
-  const state = likeSyncState.get(cardId) ?? { inFlight: false, needsSync: false };
-  const serverLiked = isCardLikedByUser(cardData);
-  const uiLiked = isLikeButtonActive(likeButton);
-
-  if (serverLiked === uiLiked) {
-    state.needsSync = false;
-    likeSyncState.set(cardId, state);
-    return;
-  }
-
-  if (state.inFlight) {
-    state.needsSync = true;
-    likeSyncState.set(cardId, state);
-    return;
-  }
-
-  state.inFlight = true;
-  state.needsSync = false;
-  likeSyncState.set(cardId, state);
-
-  changeLikeCardStatus(cardId, serverLiked)
-    .then((updatedCardData) => {
-      updateCardInCache(updatedCardData);
-      updateCardLikeState(cardElement, updatedCardData, currentUserId);
-      syncAppDataToStorage();
-    })
-    .catch((err) => {
-      console.log(err);
+  changeLikeCardStatus(cardId, isLiked)
+    .then((cardData) => {
       updateCardLikeState(cardElement, cardData, currentUserId);
     })
-    .finally(() => {
-      const currentState = likeSyncState.get(cardId) ?? {
-        inFlight: false,
-        needsSync: false,
-      };
-      const actualCardData = cardsCache.get(cardId) ?? cardData;
-
-      currentState.inFlight = false;
-
-      const shouldSyncAgain =
-        currentState.needsSync ||
-        isLikeButtonActive(likeButton) !== isCardLikedByUser(actualCardData);
-
-      currentState.needsSync = false;
-      likeSyncState.set(cardId, currentState);
-
-      if (shouldSyncAgain) {
-        syncLikeWithServer(cardElement, likeButton);
-      }
-    });
-};
-
-const handleLikeClick = (cardElement, likeButton) => {
-  const cardId = cardElement.dataset.cardId;
-
-  if (!cardId) {
-    return;
-  }
-
-  const likeCountElement = cardElement.querySelector(".card__like-count");
-  const wasLiked = isLikeButtonActive(likeButton);
-  const previousCount = Number(likeCountElement.textContent);
-
-  likeButton.classList.toggle("card__like-button_is-active");
-  likeCountElement.textContent = wasLiked ? previousCount - 1 : previousCount + 1;
-
-  syncLikeWithServer(cardElement, likeButton);
-};
-
-const handleDeleteCardClick = (cardElement) => {
-  cardToDelete = cardElement;
-  openModalWindow(removeCardModalWindow);
-};
-
-const handleRemoveCardSubmit = (evt) => {
-  evt.preventDefault();
-  const cardId = cardToDelete.dataset.cardId;
-
-  setButtonLoadingState(removeCardSubmitButton, true, "Удаление…");
-
-  deleteCard(cardId)
-    .then(() => {
-      cardsCache.delete(cardId);
-      cardToDelete.remove();
-      cardToDelete = null;
-      closeModalWindow(removeCardModalWindow);
-      syncAppDataToStorage();
-    })
     .catch((err) => {
       console.log(err);
-    })
-    .finally(() => {
-      setButtonLoadingState(removeCardSubmitButton, false);
     });
-};
+}
 
-const resetCardToDelete = () => {
-  cardToDelete = null;
-};
+function handleDeleteClick(cardId, cardElement) {
+  cardIdToDelete = cardId;
+  cardElementToDelete = cardElement;
+  openModalWindow(deleteCardModalWindow);
+}
 
-const handleInfoClick = (cardId) => {
-  if (!cardId) {
-    return;
-  }
+function handleInfoClick(cardId) {
+  getCardList()
+    .then((cards) => {
+      const cardData = cards.find((card) => card._id === cardId);
 
-  activeInfoCardId = cardId;
-  fillCardInfoModal(cardsCache.get(cardId));
-  openModalWindow(cardInfoModalWindow);
-
-  requestCardsForInfo()
-    .then(() => {
-      if (activeInfoCardId !== cardId) {
+      if (!cardData) {
         return;
       }
 
-      fillCardInfoModal(cardsCache.get(cardId));
+      cardInfoModalInfoList.replaceChildren();
+      cardInfoModalUserList.replaceChildren();
+      cardInfoModalTitle.textContent = "Информация о карточке";
+
+      cardInfoModalInfoList.append(
+        createInfoString("Описание:", cardData.name),
+        createInfoString(
+          "Дата создания:",
+          formatDate(new Date(cardData.createdAt))
+        ),
+        createInfoString("Владелец:", cardData.owner.name),
+        createInfoString("Количество лайков:", String(cardData.likes.length))
+      );
+
+      cardInfoModalText.textContent = "Лайкнули:";
+
+      cardData.likes.forEach((user) => {
+        cardInfoModalUserList.append(createUserPreview(user.name));
+      });
+
+      openModalWindow(cardInfoModalWindow);
     })
     .catch((err) => {
       console.log(err);
     });
-};
+}
 
 const handleProfileFormSubmit = (evt) => {
   evt.preventDefault();
-  setButtonLoadingState(profileSubmitButton, true, "Сохранение…");
+
+  setButtonLoadingState(profileSubmitButton, true, "Сохранение...", "Сохранить");
 
   setUserInfo({
     name: profileTitleInput.value,
     about: profileDescriptionInput.value,
   })
     .then((userData) => {
-      profileTitle.textContent = userData.name;
-      profileDescription.textContent = userData.about;
+      renderUserInfo(userData);
       closeModalWindow(profileFormModalWindow);
-      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(profileSubmitButton, false);
+      setButtonLoadingState(
+        profileSubmitButton,
+        false,
+        "Сохранение...",
+        "Сохранить"
+      );
     });
 };
 
 const handleAvatarFormSubmit = (evt) => {
   evt.preventDefault();
-  setButtonLoadingState(avatarSubmitButton, true, "Сохранение…");
+
+  setButtonLoadingState(avatarSubmitButton, true, "Сохранение...", "Сохранить");
 
   setUserAvatar({
     avatar: avatarInput.value,
   })
     .then((userData) => {
-      profileAvatar.style.backgroundImage = `url(${userData.avatar})`;
+      renderUserInfo(userData);
       closeModalWindow(avatarFormModalWindow);
-      avatarForm.reset();
-      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(avatarSubmitButton, false);
+      setButtonLoadingState(
+        avatarSubmitButton,
+        false,
+        "Сохранение...",
+        "Сохранить"
+      );
     });
 };
 
 const handleCardFormSubmit = (evt) => {
   evt.preventDefault();
-  setButtonLoadingState(cardSubmitButton, true, "Создание…");
+
+  setButtonLoadingState(cardSubmitButton, true, "Создание...", "Создать");
 
   addCard({
     name: cardNameInput.value,
     link: cardLinkInput.value,
   })
     .then((cardData) => {
-      updateCardInCache(cardData);
-      placesWrap.prepend(createCardElement(cardData, currentUserId));
+      placesWrap.prepend(
+        createCardElement(cardData, currentUserId, cardHandlers)
+      );
       closeModalWindow(cardFormModalWindow);
-      cardForm.reset();
-      syncAppDataToStorage();
     })
     .catch((err) => {
       console.log(err);
     })
     .finally(() => {
-      setButtonLoadingState(cardSubmitButton, false);
+      setButtonLoadingState(cardSubmitButton, false, "Создание...", "Создать");
     });
 };
 
-setPlacesListClickHandler();
+const handleDeleteCardFormSubmit = (evt) => {
+  evt.preventDefault();
 
-const bootstrapApp = () => {
-  const hadCache = loadCachedAppData();
+  setButtonLoadingState(deleteCardSubmitButton, true, "Удаление...", "Да");
 
-  if (hadCache) {
-    removeCardsLoader();
-  }
-
-  let pendingUserData = null;
-  let pendingCards = null;
-
-  const tryFinishCards = () => {
-    if (!pendingCards || !currentUserId) {
-      return;
-    }
-
-    if (!hasRenderedCards()) {
-      removeCardsLoader();
-      placesWrap.replaceChildren();
-      renderCards(pendingCards);
-    } else {
-      syncCardsInDom(pendingCards);
-    }
-
-    if (pendingUserData) {
-      saveAppDataToStorage(pendingUserData, pendingCards);
-    }
-  };
-
-  getUserInfo()
-    .then((userData) => {
-      pendingUserData = userData;
-      applyUserData(userData);
-      tryFinishCards();
+  deleteCardFromServer(cardIdToDelete)
+    .then(() => {
+      deleteCardElement(cardElementToDelete);
+      closeModalWindow(deleteCardModalWindow);
+      cardIdToDelete = null;
+      cardElementToDelete = null;
     })
     .catch((err) => {
       console.log(err);
-    });
-
-  getCardList()
-    .then((cards) => {
-      pendingCards = cards;
-      updateCardsCache(cards);
-      tryFinishCards();
     })
-    .catch((err) => {
-      console.log(err);
-
-      if (!hasRenderedCards()) {
-        removeCardsLoader();
-      }
+    .finally(() => {
+      setButtonLoadingState(deleteCardSubmitButton, false, "Удаление...", "Да");
     });
 };
-
-bootstrapApp();
 
 profileForm.addEventListener("submit", handleProfileFormSubmit);
 cardForm.addEventListener("submit", handleCardFormSubmit);
 avatarForm.addEventListener("submit", handleAvatarFormSubmit);
-removeCardForm.addEventListener("submit", handleRemoveCardSubmit);
+deleteCardForm.addEventListener("submit", handleDeleteCardFormSubmit);
 
 openProfileFormButton.addEventListener("click", () => {
   profileTitleInput.value = profileTitle.textContent;
@@ -649,17 +320,14 @@ allPopups.forEach((popup) => {
   setCloseModalWindowEventListeners(popup);
 });
 
-removeCardModalWindow.querySelector(".popup__close").addEventListener("click", resetCardToDelete);
-removeCardModalWindow.addEventListener("mousedown", (evt) => {
-  if (evt.target.classList.contains("popup")) {
-    resetCardToDelete();
-  }
-});
-
-document.addEventListener("keyup", (evt) => {
-  if (evt.key === "Escape" && removeCardModalWindow.classList.contains("popup_is-opened")) {
-    resetCardToDelete();
-  }
-});
-
 enableValidation(validationSettings);
+
+Promise.all([getCardList(), getUserInfo()])
+  .then(([cards, userData]) => {
+    currentUserId = userData._id;
+    renderUserInfo(userData);
+    renderCards(cards, currentUserId);
+  })
+  .catch((err) => {
+    console.log(err);
+  });

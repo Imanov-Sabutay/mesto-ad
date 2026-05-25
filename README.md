@@ -1,6 +1,5 @@
 # Mesto
 
-Вариант 1
 Социальная сеть для публикации фотографий интересных мест.
 
 ## Ссылка на проект
@@ -22,3 +21,7 @@ npm run dev    # запуск локального сервера разрабо
 npm run build  # сборка проекта в папку dist
 npm run deploy # публикация проекта на GitHub Pages
 ```
+
+## GitHub Pages
+
+В настройках репозитория: **Settings → Pages → Branch: `gh-pages`**, **Folder: `/ (root)`**.

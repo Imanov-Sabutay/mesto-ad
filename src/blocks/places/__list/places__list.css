@@ -7,37 +7,3 @@
   margin: 0;
   padding: 0;
 }
-
-.card_skeleton {
-  pointer-events: none;
-}
-
-.card__image_skeleton {
-  width: 282px;
-  height: 282px;
-  background: rgba(255, 255, 255, 0.08);
-  animation: places-skeleton-pulse 1.2s ease-in-out infinite;
-}
-
-.card__title_skeleton {
-  width: 70%;
-  height: 18px;
-  margin-top: 25px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  animation: places-skeleton-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes places-skeleton-pulse {
-  0% {
-    opacity: 0.45;
-  }
-
-  50% {
-    opacity: 0.9;
-  }
-
-  100% {
-    opacity: 0.45;
-  }
-}

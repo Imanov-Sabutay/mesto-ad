@@ -38,59 +38,65 @@ const hasInvalidInput = (formElement, settings) => {
   );
 };
 
-const disableSubmitButton = (formElement, settings) => {
-  const { submitButtonSelector, inactiveButtonClass } = settings;
-  const submitButton = formElement.querySelector(submitButtonSelector);
+const disableSubmitButton = (submitButton, settings) => {
+  const { inactiveButtonClass } = settings;
 
   submitButton.classList.add(inactiveButtonClass);
   submitButton.disabled = true;
 };
 
-const enableSubmitButton = (formElement, settings) => {
-  const { submitButtonSelector, inactiveButtonClass } = settings;
-  const submitButton = formElement.querySelector(submitButtonSelector);
+const enableSubmitButton = (submitButton, settings) => {
+  const { inactiveButtonClass } = settings;
 
   submitButton.classList.remove(inactiveButtonClass);
   submitButton.disabled = false;
 };
 
-const toggleButtonState = (formElement, settings) => {
+const toggleButtonState = (formElement, submitButton, settings) => {
   if (hasInvalidInput(formElement, settings)) {
-    disableSubmitButton(formElement, settings);
+    disableSubmitButton(submitButton, settings);
   } else {
-    enableSubmitButton(formElement, settings);
+    enableSubmitButton(submitButton, settings);
   }
 };
 
 const setEventListeners = (formElement, settings) => {
-  const { inputSelector } = settings;
+  const { inputSelector, submitButtonSelector } = settings;
   const inputList = formElement.querySelectorAll(inputSelector);
+  const submitButton = formElement.querySelector(submitButtonSelector);
 
   inputList.forEach((inputElement) => {
     inputElement.addEventListener("input", () => {
       checkInputValidity(formElement, inputElement, settings);
-      toggleButtonState(formElement, settings);
+      toggleButtonState(formElement, submitButton, settings);
     });
   });
 };
 
 export const clearValidation = (formElement, settings) => {
-  const { inputSelector } = settings;
+  const { inputSelector, submitButtonSelector } = settings;
   const inputList = formElement.querySelectorAll(inputSelector);
+  const submitButton = formElement.querySelector(submitButtonSelector);
 
   inputList.forEach((inputElement) => {
     hideInputError(formElement, inputElement, settings);
   });
 
-  disableSubmitButton(formElement, settings);
+  disableSubmitButton(submitButton, settings);
 };
 
 export const enableValidation = (settings) => {
-  const { formSelector } = settings;
+  const { formSelector, inputSelector, submitButtonSelector } = settings;
   const formList = document.querySelectorAll(formSelector);
 
   formList.forEach((formElement) => {
+    if (!formElement.querySelector(inputSelector)) {
+      return;
+    }
+
+    const submitButton = formElement.querySelector(submitButtonSelector);
+
     setEventListeners(formElement, settings);
-    disableSubmitButton(formElement, settings);
+    disableSubmitButton(submitButton, settings);
   });
 };

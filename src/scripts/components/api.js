@@ -13,13 +13,13 @@ const getResponseData = (res) => {
 export const getUserInfo = () => {
   return fetch(`${config.baseUrl}/users/me`, {
     headers: config.headers,
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };
 
 export const getCardList = () => {
   return fetch(`${config.baseUrl}/cards`, {
     headers: config.headers,
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };
 
 export const setUserInfo = ({ name, about }) => {
@@ -30,7 +30,7 @@ export const setUserInfo = ({ name, about }) => {
       name,
       about,
     }),
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };
 
 export const setUserAvatar = ({ avatar }) => {
@@ -40,7 +40,7 @@ export const setUserAvatar = ({ avatar }) => {
     body: JSON.stringify({
       avatar,
     }),
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };
 
 export const addCard = ({ name, link }) => {
@@ -51,19 +51,19 @@ export const addCard = ({ name, link }) => {
       name,
       link,
     }),
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };
 
 export const deleteCard = (cardId) => {
   return fetch(`${config.baseUrl}/cards/${cardId}`, {
     method: "DELETE",
     headers: config.headers,
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };
 
 export const changeLikeCardStatus = (cardId, isLiked) => {
   return fetch(`${config.baseUrl}/cards/likes/${cardId}`, {
     method: isLiked ? "DELETE" : "PUT",
     headers: config.headers,
-  }).then((res) => getResponseData(res));
+  }).then(getResponseData);
 };

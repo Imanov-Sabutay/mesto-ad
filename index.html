@@ -8,8 +8,6 @@
     />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Mesto</title>
-    <link rel="dns-prefetch" href="https://mesto.nomoreparties.co" />
-    <link rel="preconnect" href="https://mesto.nomoreparties.co" />
     <link rel="stylesheet" href="./src/pages/index.css" />
   </head>
   <body class="page">
@@ -32,44 +30,7 @@
           <button class="profile__add-button" type="button"></button>
         </section>
         <section class="places page__section">
-          <ul class="places__list places__list_loading">
-            <li class="places__item card card_skeleton" aria-hidden="true">
-              <div class="card__image card__image_skeleton"></div>
-              <div class="card__description">
-                <h2 class="card__title card__title_skeleton"></h2>
-              </div>
-            </li>
-            <li class="places__item card card_skeleton" aria-hidden="true">
-              <div class="card__image card__image_skeleton"></div>
-              <div class="card__description">
-                <h2 class="card__title card__title_skeleton"></h2>
-              </div>
-            </li>
-            <li class="places__item card card_skeleton" aria-hidden="true">
-              <div class="card__image card__image_skeleton"></div>
-              <div class="card__description">
-                <h2 class="card__title card__title_skeleton"></h2>
-              </div>
-            </li>
-            <li class="places__item card card_skeleton" aria-hidden="true">
-              <div class="card__image card__image_skeleton"></div>
-              <div class="card__description">
-                <h2 class="card__title card__title_skeleton"></h2>
-              </div>
-            </li>
-            <li class="places__item card card_skeleton" aria-hidden="true">
-              <div class="card__image card__image_skeleton"></div>
-              <div class="card__description">
-                <h2 class="card__title card__title_skeleton"></h2>
-              </div>
-            </li>
-            <li class="places__item card card_skeleton" aria-hidden="true">
-              <div class="card__image card__image_skeleton"></div>
-              <div class="card__description">
-                <h2 class="card__title card__title_skeleton"></h2>
-              </div>
-            </li>
-          </ul>
+          <ul class="places__list"></ul>
         </section>
       </main>
       <footer class="footer page__section">
@@ -212,11 +173,14 @@
           <button type="button" class="popup__close"></button>
           <h3 class="popup__title"></h3>
           <dl class="popup__info"></dl>
+
           <h4 class="popup__text"></h4>
           <ul class="popup__list"></ul>
         </div>
       </div>
     </div>
+
+    <script type="module" src="/src/scripts/index.js"></script>
 
     <template id="card-template">
       <li class="places__item card">
@@ -245,94 +209,5 @@
     <template id="popup-info-user-preview-template">
       <li class="popup__list-item popup__list-item_type_badge"></li>
     </template>
-
-    <script>
-      (function () {
-        var storageKey = "mesto-app-data";
-
-        try {
-          var storedData = localStorage.getItem(storageKey);
-
-          if (!storedData) {
-            return;
-          }
-
-          var parsedData = JSON.parse(storedData);
-          var userData = parsedData.userData;
-          var cards = parsedData.cards;
-
-          if (!userData || !userData._id || !Array.isArray(cards)) {
-            return;
-          }
-
-          var paintCachedData = function () {
-            var profileTitle = document.querySelector(".profile__title");
-            var profileDescription = document.querySelector(".profile__description");
-            var profileAvatar = document.querySelector(".profile__image");
-            var placesList = document.querySelector(".places__list");
-            var cardTemplate = document.getElementById("card-template");
-
-            if (!profileTitle || !placesList || !cardTemplate) {
-              return;
-            }
-
-            profileTitle.textContent = userData.name;
-            profileDescription.textContent = userData.about;
-            profileAvatar.style.backgroundImage = "url(" + userData.avatar + ")";
-
-            var cardFragment = document.createDocumentFragment();
-
-            cards.forEach(function (cardData) {
-              var cardElement = cardTemplate.content
-                .querySelector(".card")
-                .cloneNode(true);
-              var cardImage = cardElement.querySelector(".card__image");
-              var likeButton = cardElement.querySelector(".card__like-button");
-              var deleteButton = cardElement.querySelector(
-                ".card__control-button_type_delete"
-              );
-
-              cardElement.dataset.cardId = cardData._id;
-              cardImage.decoding = "async";
-              cardImage.src = cardData.link;
-              cardImage.alt = cardData.name;
-              cardElement.querySelector(".card__title").textContent = cardData.name;
-              cardElement.querySelector(".card__like-count").textContent =
-                String(cardData.likes.length);
-
-              if (
-                cardData.likes.some(function (user) {
-                  return user._id === userData._id;
-                })
-              ) {
-                likeButton.classList.add("card__like-button_is-active");
-              }
-
-              if (cardData.owner._id !== userData._id) {
-                deleteButton.remove();
-              }
-
-              cardFragment.append(cardElement);
-            });
-
-            placesList.classList.remove("places__list_loading");
-            placesList.replaceChildren();
-            placesList.append(cardFragment);
-            window.__mestoCachePainted = true;
-          };
-
-          if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", paintCachedData);
-          } else {
-            paintCachedData();
-          }
-        } catch (error) {
-          console.log(error);
-        }
-      })();
-    </script>
-
-    <script type="module" src="/src/scripts/index.js"></script>
   </body>
 </html>
-
